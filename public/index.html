@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloudflare 邮箱管理</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>📧 邮箱管理中心</h1>
+      <p>Cloudflare Email Worker + D1</p>
+    </header>
+
+    <nav>
+      <button class="tab active" data-tab="emails">📬 邮件</button>
+      <button class="tab" data-tab="aliases">🏷️ 别名</button>
+      <button class="tab" data-tab="forwards">🔗 转发</button>
+      <button class="tab" data-tab="settings">⚙️ 设置</button>
+    </nav>
+
+    <!-- 邮件列表 -->
+    <section id="emails" class="panel active">
+      <div class="panel-header">
+        <h2>收件箱</h2>
+        <div class="actions">
+          <input type="text" id="search-input" placeholder="搜索...">
+          <button onclick="loadEmails()">🔄 刷新</button>
+          <button onclick="clearAllEmails()">🗑️ 清空</button>
+        </div>
+      </div>
+      <div id="emails-list" class="email-list">
+        <div class="loading">加载中...</div>
+      </div>
+      <div id="email-detail" class="email-detail hidden">
+        <div class="detail-header">
+          <button onclick="closeDetail()">← 返回</button>
+          <button onclick="deleteCurrentEmail()" class="danger">删除</button>
+        </div>
+        <div class="detail-content" id="detail-content"></div>
+      </div>
+    </section>
+
+    <!-- 别名管理 -->
+    <section id="aliases" class="panel">
+      <div class="panel-header">
+        <h2>别名管理</h2>
+        <p>配置邮件别名，将 *@yourdomain.com 转发到你的真实邮箱</p>
+      </div>
+      <div class="add-form">
+        <input type="text" id="alias-domain" placeholder="域名（如 yourdomain.com）">
+        <input type="email" id="alias-target" placeholder="真实邮箱（如 user@gmail.com）">
+        <button onclick="addAlias()">+ 添加别名</button>
+      </div>
+      <div id="aliases-list" class="item-list">
+        <div class="loading">加载中...</div>
+      </div>
+    </section>
+
+    <!-- 转发规则 -->
+    <section id="forwards" class="panel">
+      <div class="panel-header">
+        <h2>Webhook 转发</h2>
+        <p>邮件到达时自动推送到你的服务</p>
+      </div>
+      <div class="add-form">
+        <input type="text" id="forward-pattern" placeholder="匹配模式（正则，如 .*）">
+        <input type="url" id="forward-url" placeholder="Webhook URL">
+        <button onclick="addForward()">+ 添加规则</button>
+      </div>
+      <div id="forwards-list" class="item-list">
+        <div class="loading">加载中...</div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section id="settings" class="panel">
+      <div class="panel-header">
+        <h2>设置</h2>
+      </div>
+      <div class="settings-content">
+        <div class="setting-item">
+          <label>自动清理邮件（保留天数）</label>
+          <input type="number" id="retention-days" value="30" min="1" max="365">
+          <button onclick="saveSettings()">保存</button>
+        </div>
+        <div class="setting-item">
+          <label>API 基础地址</label>
+          <input type="text" id="api-base" readonly>
+        </div>
+        <div class="info-box">
+          <h3>部署步骤</h3>
+          <ol>
+            <li>创建 Cloudflare D1 数据库 <code>email-db</code></li>
+            <li>修改 <code>wrangler.toml</code> 填入 database_id</li>
+            <li>运行 <code>npx wrangler d1 execute email-db --remote --file=database/schema.sql</code></li>
+            <li>运行 <code>npx wrangler deploy</code></li>
+            <li>配置 DNS MX 记录：<code>@ MX 10 mx.cloudflare.com</code></li>
+            <li>在 Cloudflare Dashboard → Email → Routes 设置 Catch-all</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
