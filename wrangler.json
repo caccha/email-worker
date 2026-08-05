@@ -1,0 +1,13 @@
+{
+  "name": "cf-email-worker",
+  "compatibility_date": "2024-01-17",
+  "main": "src/index.ts",
+  "account_id": "f066185b71c55a6bfe34ed0200fac692",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "email-db",
+      "database_id": "45cf493a-686d-4204-a45b-d7b2e7ced6e1"
+    }
+  ]
+}
