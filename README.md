@@ -39,7 +39,43 @@ database_id = "你的D1_DATABASE_ID"
 npx wrangler d1 execute email-db --remote --file=database/schema.sql
 ```
 
-### 3. 部署
+### 3. 配置 GitHub Actions (可选)
+
+项目支持 GitHub Actions 自动部署到 Cloudflare。
+
+**步骤：**
+
+1. 在仓库 Settings → Secrets and variables → Actions 中添加：
+   - `CLOUDFLARE_API_TOKEN`: Cloudflare API Token
+   - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare Account ID
+
+2. 在仓库根目录创建 `.github/workflows/deploy.yml`：
+```yaml
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+3. 推送代码时会自动触发部署，或手动在 Actions 页面触发。
+
+### 4. 部署
 
 ```bash
 npx wrangler deploy
