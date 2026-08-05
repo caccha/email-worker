@@ -81,7 +81,7 @@ jobs:
 npx wrangler deploy
 ```
 
-### 4. 配置 DNS 和 Email Routing
+### 5. 配置 DNS 和 Email Routing
 
 **DNS 设置：**
 ```
@@ -92,7 +92,7 @@ npx wrangler deploy
 1. 添加域名
 2. 创建 Catch-all 规则，路由到 `你的-worker-name.workers.dev`
 
-## 使用 Web UI
+### 6. 使用 Web UI
 
 部署后访问：
 ```

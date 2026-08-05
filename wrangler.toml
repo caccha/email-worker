@@ -1,8 +1,8 @@
 name = "cf-email-worker"
 compatibility_date = "2024-01-17"
 main = "src/index.ts"
-node_compat = true
-account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+nodejs_compat = true
+account_id = "7c1db78912c3d4a3a56877a0273ce7a2"
 
 # D1 数据库
 [[d1_databases]]
