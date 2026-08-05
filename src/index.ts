@@ -55,16 +55,18 @@ export default {
       const search = url.searchParams.get("search") || "";
 
       let query = `SELECT * FROM emails WHERE 1=1`;
-      const params: (string | number)[] = [limit];
+      const params: (string | number)[] = [];
 
       if (search) {
         query += ` AND (subject LIKE ? OR from_addr LIKE ? OR text_body LIKE ?)`;
         const like = `%${search}%`;
-        params.unshift(like, like, like);
+        params.push(like, like, like);
       }
 
       query += ` ORDER BY received_at DESC LIMIT ?`;
-      const result = await env.DB.prepare(query).bind(...params).all();
+      params.push(limit);
+      
+      const result = await env.DB.prepare(query).bind(params as (string | number | bigint | Date | ArrayBuffer | null)[]).all();
       return Response.json({ success: true, data: result.results });
     }
 
