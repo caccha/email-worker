@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "nodejs_compat": true,
   "account_id": "cd36fe8761bcbd7ee58e3c4b7668b817",
+  "assets": {
+    "directory": "./public"
+  },
   "d1_databases": [
     {
       "binding": "DB",
