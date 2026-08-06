@@ -88,7 +88,7 @@ async function showEmail(id) {
         <div><strong>收到时间:</strong> ${formatTime(e.received_at)}</div>
         <div><strong>Message-ID:</strong> ${escapeHtml(e.message_id)}</div>
       </div>
-      ${e.html_body ? `<h3>HTML 内容</h3><iframe srcdoc="${escapeHtml(e.html_body)}"></iframe>` : ''}
+      ${e.html_body ? `<h3>HTML 内容</h3><iframe sandbox srcdoc="${escapeAttr(e.html_body)}"></iframe>` : ''}
       ${e.text_body ? `<h3>纯文本</h3><pre>${escapeHtml(e.text_body)}</pre>` : ''}
     `;
   } catch (err) {
@@ -251,6 +251,11 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function escapeAttr(text) {
+  if (!text) return '';
+  return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
 function formatTime(dateStr) {

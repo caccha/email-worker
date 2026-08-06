@@ -22,7 +22,7 @@ export function parseRawEmail(raw: string): ParsedEmail {
     else if (lower.startsWith("message-id:")) messageId = line.replace(/^message-id:\s*/i, "").trim();
   }
 
-  if (!messageId) messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  if (!messageId) messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   if (!subject) subject = "(无主题)";
 
   const body = lines.slice(headersEnd).join("\r\n");
@@ -31,22 +31,71 @@ export function parseRawEmail(raw: string): ParsedEmail {
   return { from, to, subject, text, html, messageId };
 }
 
-function extractParts(body: string): { text: string; html: string } {
-  const boundaryMatch = body.match(/boundary=["']?([^"'\r\n;]+)/i);
-  const boundary = boundaryMatch ? boundaryMatch[1] : `--boundary`;
+function decodeContent(body: string, encoding: string): string {
+  const enc = encoding.toLowerCase().trim();
+  if (enc === "base64") {
+    try {
+      // 清理 base64 内容中的换行符
+      const clean = body.replace(/[\r\n\s]/g, "");
+      const decoded = atob(clean);
+      return decoded;
+    } catch {
+      return body;
+    }
+  }
+  return body;
+}
 
-  const parts = body.split(boundary);
+function extractParts(body: string): { text: string; html: string } {
+  // 尝试匹配 multipart boundary
+  const boundaryMatch = body.match(/boundary="([^"]+)"/i) || body.match(/boundary=([^\r\n;]+)/i);
+  if (!boundaryMatch) {
+    // 非 multipart，检查 Content-Transfer-Encoding
+    const encMatch = body.match(/Content-Transfer-Encoding:\s*(\S+)/i);
+    const encoding = encMatch ? encMatch[1] : "";
+    const headerEnd = body.indexOf("\r\n\r\n");
+    const content = headerEnd >= 0 ? body.substring(headerEnd + 4) : body;
+    if (body.match(/<html/i)) {
+      return { text: "", html: decodeContent(content.trim(), encoding) };
+    }
+    return { text: decodeContent(content.trim(), encoding), html: "" };
+  }
+
+  const boundary = boundaryMatch[1].trim();
+  const parts = body.split("--" + boundary);
   let text = "", html = "";
 
-  for (let i = 1; i < parts.length - 1; i++) {
+  for (let i = 1; i < parts.length; i++) {
     const part = parts[i];
-    const headers = part.split("\r\n\r\n")[0] || part.split("\n\n")[0];
-    const content = part.replace(headers, "").replace(/^\r?\n/, "");
+    // 跳过结尾标记 --boundary--
+    if (part.trim() === "--" || part.trim() === "") continue;
 
-    if (headers.includes("text/plain")) {
-      text = content.trim();
-    } else if (headers.includes("text/html")) {
-      html = content.trim();
+    const headerEnd = part.indexOf("\r\n\r\n");
+    if (headerEnd < 0) continue;
+
+    const headerSection = part.substring(0, headerEnd);
+    let content = part.substring(headerEnd + 4);
+
+    // 处理嵌套 multipart（如 multipart/alternative 嵌入 multipart/mixed）
+    if (headerSection.includes("multipart/")) {
+      const nested = extractParts(content);
+      if (nested.html) html = nested.html;
+      if (nested.text) text = nested.text;
+      continue;
+    }
+
+    // 获取 Content-Transfer-Encoding
+    const encMatch = headerSection.match(/Content-Transfer-Encoding:\s*(\S+)/i);
+    const encoding = encMatch ? encMatch[1] : "";
+
+    // 去除末尾的 boundary 分隔符残留
+    content = content.replace(/\r?\n--\r?\n?$/, "").trim();
+    const decoded = decodeContent(content, encoding);
+
+    if (headerSection.includes("text/html")) {
+      html = decoded;
+    } else if (headerSection.includes("text/plain")) {
+      text = decoded;
     }
   }
 
@@ -69,12 +118,12 @@ export async function saveEmail(env: Env, data: ParsedEmail): Promise<number> {
 
 export async function getAliases(env: Env): Promise<Alias[]> {
   const result = await env.DB.prepare("SELECT id, alias, target_email FROM aliases").all();
-  return (result.results ?? []) as Alias[];
+  return (result.results ?? []) as unknown as Alias[];
 }
 
 export async function getForwards(env: Env): Promise<ForwardRule[]> {
   const result = await env.DB.prepare("SELECT id, pattern, target_url FROM forwards").all();
-  return (result.results ?? []) as ForwardRule[];
+  return (result.results ?? []) as unknown as ForwardRule[];
 }
 
 export async function fetchWebhook(url: string, payload: object): Promise<boolean> {

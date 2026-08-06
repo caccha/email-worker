@@ -2,7 +2,7 @@ import type { Env, ParsedEmail } from "./types";
 import { parseRawEmail, saveEmail, getAliases, getForwards, fetchWebhook } from "./helpers";
 
 export default {
-  async email(message: { mailFrom: string; rcptTo: string; headers: { get: (n: string) => string | null }; raw: string }, env: Env): Promise<void> {
+  async email(message: { mailFrom: string; rcptTo: string; headers: { get: (n: string) => string | null }; raw: string; accept: () => void }, env: Env): Promise<void> {
     const parsed = parseRawEmail(message.raw);
     const messageId = message.headers.get("message-id") || `msg-${Date.now()}`;
     parsed.messageId = messageId;
