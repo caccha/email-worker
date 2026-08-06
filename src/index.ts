@@ -2,47 +2,78 @@ import type { Env, ParsedEmail } from "./types";
 import { parseRawEmail, saveEmail, getAliases, getForwards, fetchWebhook } from "./helpers";
 
 export default {
-  async email(message: { mailFrom: string; rcptTo: string; headers: { get: (n: string) => string | null }; raw: string; accept: () => void }, env: Env): Promise<void> {
-    const parsed = parseRawEmail(message.raw);
-    const messageId = message.headers.get("message-id") || `msg-${Date.now()}`;
-    parsed.messageId = messageId;
-
-    // 保存到 D1
-    const emailId = await saveEmail(env, parsed);
-    console.log(`📥 邮件已保存: ID=${emailId}, from=${parsed.from}, to=${parsed.to}, subject=${parsed.subject}`);
-
-    // 查找别名
-    const aliases = await getAliases(env);
-    const alias = aliases.find(a => message.rcptTo.endsWith(`@${a.alias}`));
-    if (alias) {
-      console.log(`📬 别名映射: ${message.rcptTo} -> ${alias.target_email}`);
-    }
-
-    // 匹配转发规则并触发 webhook
-    const forwards = await getForwards(env);
-    for (const fwd of forwards) {
-      try {
-        const regex = new RegExp(fwd.pattern);
-        if (regex.test(message.rcptTo) || regex.test(parsed.subject)) {
-          const webhookPayload = {
-            emailId,
-            from: parsed.from,
-            to: parsed.to,
-            subject: parsed.subject,
-            text: parsed.text.substring(0, 2000),
-            html: parsed.html.substring(0, 5000),
-            receivedAt: new Date().toISOString(),
-            matchedPattern: fwd.pattern,
-          };
-          const ok = await fetchWebhook(fwd.target_url, webhookPayload);
-          console.log(`🔗 Webhook ${ok ? "成功" : "失败"}: ${fwd.target_url}`);
+  async email(message: { from: string; to: string; headers: { get: (n: string) => string | null }; raw: ReadableStream | string; accept: () => void; reject?: (reason?: string) => void }, env: Env): Promise<void> {
+    try {
+      // 读取原始邮件内容 (raw 可能是 ReadableStream 或 string)
+      let rawText: string;
+      if (typeof message.raw === "string") {
+        rawText = message.raw;
+      } else {
+        const reader = message.raw.getReader();
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) chunks.push(value);
         }
-      } catch (e) {
-        console.error(`转发规则匹配失败: ${fwd.pattern}`, e);
+        const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+        const merged = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const c of chunks) {
+          merged.set(c, offset);
+          offset += c.length;
+        }
+        rawText = new TextDecoder().decode(merged);
       }
-    }
 
-    message.accept();
+      const parsed = parseRawEmail(rawText);
+      const messageId = message.headers.get("message-id") || `msg-${Date.now()}`;
+      parsed.messageId = messageId;
+
+      // 保存到 D1
+      const emailId = await saveEmail(env, parsed);
+      console.log(`📥 邮件已保存: ID=${emailId}, from=${parsed.from}, to=${parsed.to}, subject=${parsed.subject}`);
+
+      // 查找别名
+      const aliases = await getAliases(env);
+      const alias = aliases.find((a: { alias: string; target_email: string }) => message.to.endsWith(`@${a.alias}`));
+      if (alias) {
+        console.log(`📬 别名映射: ${message.to} -> ${alias.target_email}`);
+      }
+
+      // 匹配转发规则并触发 webhook
+      const forwards = await getForwards(env);
+      for (const fwd of forwards) {
+        try {
+          const regex = new RegExp(fwd.pattern);
+          if (regex.test(message.to) || regex.test(parsed.subject)) {
+            const webhookPayload = {
+              emailId,
+              from: parsed.from,
+              to: parsed.to,
+              subject: parsed.subject,
+              text: parsed.text.substring(0, 2000),
+              html: parsed.html.substring(0, 5000),
+              receivedAt: new Date().toISOString(),
+              matchedPattern: fwd.pattern,
+            };
+            const ok = await fetchWebhook(fwd.target_url, webhookPayload);
+            console.log(`🔗 Webhook ${ok ? "成功" : "失败"}: ${fwd.target_url}`);
+          }
+        } catch (e) {
+          console.error(`转发规则匹配失败: ${fwd.pattern}`, e);
+        }
+      }
+
+      message.accept();
+    } catch (err) {
+      console.error("❌ 邮件处理失败:", err);
+      // 拒绝邮件，让发送方知道失败了
+      if (message.reject) {
+        message.reject(String(err));
+      }
+      throw err;
+    }
   },
 
   async fetch(request: Request, env: Env): Promise<Response> {
