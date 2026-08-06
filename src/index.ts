@@ -2,7 +2,7 @@ import type { Env, ParsedEmail } from "./types";
 import { parseRawEmail, saveEmail, getAliases, getForwards, fetchWebhook } from "./helpers";
 
 export default {
-  async email(message: { from: string; to: string; headers: { get: (n: string) => string | null }; raw: ReadableStream | string; accept: () => void; reject?: (reason?: string) => void }, env: Env): Promise<void> {
+  async email(message: { from: string; to: string; headers: { get: (n: string) => string | null }; raw: ReadableStream | string; setReject?: (reason?: string) => void }, env: Env): Promise<void> {
     try {
       // 读取原始邮件内容 (raw 可能是 ReadableStream 或 string)
       let rawText: string;
@@ -65,14 +65,13 @@ export default {
         }
       }
 
-      message.accept();
+      // Cloudflare Email Worker: 函数正常返回即表示接受邮件，无需调用 accept()
     } catch (err) {
       console.error("❌ 邮件处理失败:", err);
-      // 拒绝邮件，让发送方知道失败了
-      if (message.reject) {
-        message.reject(String(err));
+      // setReject 是可选的，有些版本可能不支持
+      if (message.setReject) {
+        message.setReject(String(err));
       }
-      throw err;
     }
   },
 
