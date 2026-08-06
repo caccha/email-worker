@@ -51,23 +51,25 @@ export default {
 
     // GET /api/emails - 列出邮件（支持搜索）
     if (pathname === "/api/emails" && request.method === "GET") {
-      const limit = Math.min(parseInt(url.searchParams.get("limit") || "20") || 20, 100);
-      const search = url.searchParams.get("search") || "";
+      try {
+        const limit = Math.min(parseInt(url.searchParams.get("limit") || "20") || 20, 100);
+        const search = url.searchParams.get("search") || "";
 
-      let query = `SELECT * FROM emails WHERE 1=1`;
-      const params: (string | number)[] = [];
-
-      if (search) {
-        query += ` AND (subject LIKE ? OR from_addr LIKE ? OR text_body LIKE ?)`;
-        const like = `%${search}%`;
-        params.push(like, like, like);
+        let result;
+        if (search) {
+          const like = `%${search}%`;
+          result = await env.DB.prepare(
+            `SELECT * FROM emails WHERE subject LIKE ? OR from_addr LIKE ? OR text_body LIKE ? ORDER BY received_at DESC LIMIT ?`
+          ).bind(like, like, like, limit).all();
+        } else {
+          result = await env.DB.prepare(
+            `SELECT * FROM emails ORDER BY received_at DESC LIMIT ?`
+          ).bind(limit).all();
+        }
+        return Response.json({ success: true, data: result.results });
+      } catch (err) {
+        return Response.json({ success: false, error: String(err) }, { status: 500 });
       }
-
-      query += ` ORDER BY received_at DESC LIMIT ?`;
-      params.push(limit);
-      
-      const result = await env.DB.prepare(query).bind(params as (string | number | bigint | Date | ArrayBuffer | null)[]).all();
-      return Response.json({ success: true, data: result.results });
     }
 
     // GET /api/emails/:id - 获取单封邮件
